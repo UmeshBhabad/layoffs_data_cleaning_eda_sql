@@ -1,0 +1,25 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors and IDEs
+.vscode/
+.idea/
+
+# Database dumps, backups and logs
+*.bak
+*.dump
+*.log
+*.sqlite
+*.db
+
+# Credentials and local config
+.env
+*.env
+config.local.*
+
+# Temporary files
+*.tmp
+*.swp
+~$*
