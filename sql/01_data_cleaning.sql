@@ -14,7 +14,7 @@
    --------------
    Step 0. Create a staging copy of the raw table
    Step 1. Remove duplicate rows
-   Step 2. Standardize the data (spaces, labels, country names, date type)
+   Step 2. Standardize the data (spaces, labels, country names, date type, column types)
    Step 3. Handle NULL and blank values
    Step 4. Remove unusable rows and helper columns
 
@@ -22,7 +22,7 @@
    ----------
    1. Import data/raw/layoffs.csv into world_layoffs.layoffs
    2. Run this script one statement at a time, top to bottom
-   3. Output table: layoffs_staging2 (input for 02_exploratory_data_analysis.sql)
+   3. Output table: layoffs_cleaned (input for 02_exploratory_data_analysis.sql)
 
    Conventions
    -----------
@@ -56,8 +56,11 @@ INSERT INTO layoffs_staging
 SELECT *
 FROM layoffs;
 
-SELECT
-	COUNT(*) AS total_rows
+-- Row count: raw table vs staging copy (expected: both 2361)
+SELECT 'raw (layoffs)' AS table_name, COUNT(*) AS total_rows
+FROM layoffs
+UNION ALL
+SELECT 'staging (layoffs_staging)', COUNT(*)
 FROM layoffs_staging;
 
 /* ------------------------------------------------------------------------------
@@ -141,6 +144,12 @@ SELECT
 		PARTITION BY company, location, industry, total_laid_off, percentage_laid_off, `date`, stage, country, funds_raised_millions) AS row_num
 FROM world_layoffs.layoffs_staging;
 
+-- Row count: rows loaded and how many of them are duplicates (expected: 2361 and 5)
+SELECT
+	COUNT(*) AS rows_loaded,
+	SUM(row_num > 1) AS duplicate_rows
+FROM world_layoffs.layoffs_staging2;
+
 -- Check: rows that are about to be deleted
 SELECT *
 FROM world_layoffs.layoffs_staging2
@@ -149,13 +158,16 @@ WHERE row_num > 1;
 -- Delete the duplicate rows
 DELETE
 FROM world_layoffs.layoffs_staging2
-WHERE row_num > 1;;
+WHERE row_num > 1;
 
 -- Check: no duplicates remain (expected: 0 rows)
 SELECT *
 FROM world_layoffs.layoffs_staging2
 WHERE row_num > 1;
 
+-- Row count after removing duplicates (expected: 2356)
+SELECT COUNT(*) AS rows_after_dedup
+FROM world_layoffs.layoffs_staging2;
 
 /* ------------------------------------------------------------------------------
    Step 2. Standardize the data
@@ -252,6 +264,32 @@ FROM layoffs_staging2;
 ALTER TABLE layoffs_staging2
 MODIFY COLUMN `date` DATE;
 
+-- 2e. Convert percentage_laid_off from text to DECIMAL(5,4)
+
+SELECT *
+FROM layoffs_staging2
+WHERE percentage_laid_off IS NULL;
+
+-- Check: no non-numeric values (expected: 0 rows)
+SELECT DISTINCT percentage_laid_off
+FROM layoffs_staging2
+WHERE percentage_laid_off NOT REGEXP '^[0-9]*\\.?[0-9]+$';
+
+-- Check: conversion loses no precision (expected: 0 rows)
+
+SELECT
+	percentage_laid_off
+FROM layoffs_staging2
+WHERE percentage_laid_off IS NOT NULL
+AND CAST(percentage_laid_off AS DECIMAL(5,4)) <> percentage_laid_off;
+
+-- Change the column type.
+
+ALTER TABLE layoffs_staging2
+MODIFY COLUMN percentage_laid_off DECIMAL(5, 4);
+
+SELECT count(percentage_laid_off)
+FROM layoffs_staging2;
 
 /* ------------------------------------------------------------------------------
    Step 3. Handle NULL and blank values
@@ -370,6 +408,10 @@ FROM layoffs_staging2
 WHERE total_laid_off IS NULL
 AND percentage_laid_off IS NULL;
 
+-- Row count of the final cleaned table (expected: 1995)
+SELECT COUNT(*) AS rows_after_cleaning
+FROM layoffs_staging2;
+
 -- 4b. Drop the helper column that was only needed to find duplicates
 SELECT *
 FROM layoffs_staging2;
@@ -377,6 +419,10 @@ FROM layoffs_staging2;
 ALTER TABLE layoffs_staging2
 DROP COLUMN row_num;
 
+-- Rename table layoffs_staging2 to layoffs_cleaned
+
+RENAME TABLE layoffs_staging2 TO layoffs_cleaned;
+
 -- Final result: the cleaned table used by the EDA script
 SELECT *
-FROM layoffs_staging2;
+FROM layoffs_cleaned;
