@@ -6,6 +6,15 @@ An end-to-end MySQL project that cleans a raw global tech layoffs dataset and th
 
 <hr>
 
+<h2>🚦 Project Status</h2>
+
+<ul>
+<li>✅ <b>Phase 1: Data Cleaning</b> — complete (<a href="sql/01_data_cleaning.sql">sql/01_data_cleaning.sql</a>)</li>
+<li>🚧 <b>Phase 2: Exploratory Data Analysis</b> — in progress</li>
+</ul>
+
+<hr>
+
 <h2>📌 Project Overview</h2>
 
 <p>
@@ -13,7 +22,7 @@ Raw data is rarely ready for analysis. This project takes a messy <b>layoffs dat
 </p>
 
 <p>
-The cleaning phase never touches the raw table. All changes happen on a <b>staging copy</b>, so the original data stays intact and every step can be repeated or checked.
+The cleaning phase never touches the raw table. All changes happen on <b>staging copies</b>, so the original data stays intact and every step can be repeated or checked.
 </p>
 
 <ul>
@@ -21,8 +30,8 @@ The cleaning phase never touches the raw table. All changes happen on a <b>stagi
 <li>Standardizing text, country names, and date formats</li>
 <li>Handling NULL and blank values, including filling gaps with a self join</li>
 <li>Dropping rows and columns that carry no usable information</li>
-<li>Analyzing layoffs by company, industry, country, stage, and time period</li>
-<li>Building rolling monthly totals and yearly company rankings</li>
+<li>Analyzing layoffs by company, industry, country, stage, and time period <i>(Phase 2)</i></li>
+<li>Building rolling monthly totals and yearly company rankings <i>(Phase 2)</i></li>
 </ul>
 
 <hr>
@@ -72,10 +81,10 @@ The dataset contains one row per layoff event. The raw file is stored in <code>d
 
 <ul>
 <li>Staging tables (<code>CREATE TABLE ... LIKE</code>, <code>INSERT INTO ... SELECT</code>)</li>
-<li>CTEs and window functions (<code>ROW_NUMBER</code>, <code>DENSE_RANK</code>, rolling <code>SUM() OVER</code>)</li>
-<li>String functions (<code>TRIM</code>, <code>SUBSTRING</code>) and <code>STR_TO_DATE</code></li>
+<li>CTEs and window functions (<code>ROW_NUMBER</code>, with <code>DENSE_RANK</code> and rolling <code>SUM() OVER</code> planned for Phase 2)</li>
+<li>String functions (<code>TRIM</code>) and <code>STR_TO_DATE</code></li>
 <li>Self joins, <code>UPDATE</code>, <code>ALTER TABLE</code>, <code>DELETE</code></li>
-<li><code>GROUP BY</code>, aggregate functions, and <code>ORDER BY</code></li>
+<li><code>GROUP BY</code>, aggregate functions, and <code>ORDER BY</code> <i>(Phase 2)</i></li>
 </ul>
 
 <hr>
@@ -83,24 +92,24 @@ The dataset contains one row per layoff event. The raw file is stored in <code>d
 <h2>📂 Project Structure</h2>
 
 <pre>
-layoffs-data-cleaning-eda-sql/
+layoffs_data_cleaning_eda_sql/
 │
 ├── README.md
 ├── .gitignore
 ├── LICENSE
 │
 ├── data/
-│   ├── raw/
-│   │   └── layoffs.csv                    # Original dataset (never edited)
-│   └── cleaned/
-│       └── layoffs_cleaned.csv            # Final table exported after cleaning
+│   └── raw/
+│       └── layoffs.csv                    # Original dataset (never edited)
 │
-├── sql/
-│   ├── 01_data_cleaning.sql               # Phase 1: cleaning pipeline
-│   └── 02_exploratory_data_analysis.sql   # Phase 2: EDA queries
-│
-└── images/                                # Screenshots of key results (optional)
+└── sql/
+    ├── 01_data_cleaning.sql               # Phase 1: cleaning pipeline
+    └── 02_exploratory_data_analysis.sql   # Phase 2: EDA queries (in progress)
 </pre>
+
+<p>
+The cleaned table is created by running <code>01_data_cleaning.sql</code>. It is stored in the database as <code>layoffs_staging2</code>.
+</p>
 
 <hr>
 
@@ -110,19 +119,19 @@ layoffs-data-cleaning-eda-sql/
 
 <ol>
 <li><b>Create a staging table</b> as a copy of the raw table, so the raw data is preserved</li>
-<li><b>Remove duplicates</b> by numbering rows with <code>ROW_NUMBER() OVER (PARTITION BY ...)</code> inside a CTE and deleting the repeats</li>
+<li><b>Remove duplicates</b> by numbering rows with <code>ROW_NUMBER() OVER (PARTITION BY ...)</code> inside a CTE, then deleting the repeats from a second staging table (MySQL cannot delete directly from a CTE)</li>
 <li><b>Standardize the data</b>
   <ul>
   <li>Trim extra spaces in company names</li>
-  <li>Merge variations of the same value in <code>industry</code> (for example, different spellings of "Crypto")</li>
-  <li>Fix inconsistent <code>country</code> values, such as a trailing period</li>
+  <li>Merge three spellings of the same industry (<code>Crypto</code>, <code>Crypto Currency</code>, <code>CryptoCurrency</code>) into <code>Crypto</code></li>
+  <li>Fix <code>United States.</code> (trailing period) so it matches <code>United States</code></li>
   <li>Convert <code>date</code> from text with <code>STR_TO_DATE</code> and change the column type to <code>DATE</code></li>
   </ul>
 </li>
 <li><b>Handle NULL and blank values</b>
   <ul>
   <li>Turn blank strings into NULL</li>
-  <li>Fill missing <code>industry</code> values from other rows of the same company using a self join</li>
+  <li>Fill missing <code>industry</code> values from other rows of the same company and location using a self join</li>
   </ul>
 </li>
 <li><b>Remove unusable rows and columns</b>
@@ -137,41 +146,54 @@ layoffs-data-cleaning-eda-sql/
 
 <table>
 <tr><th>Metric</th><th>Value</th></tr>
-<tr><td>Rows in raw table</td><td>XXXX</td></tr>
-<tr><td>Duplicate rows removed</td><td>XX</td></tr>
-<tr><td>Rows removed with no layoff data</td><td>XXX</td></tr>
-<tr><td>Rows in final cleaned table</td><td>XXXX</td></tr>
+<tr><td>Rows in raw table</td><td>2,361</td></tr>
+<tr><td>Duplicate rows removed</td><td>5</td></tr>
+<tr><td>Rows removed with no layoff data</td><td>361</td></tr>
+<tr><td><b>Rows in final cleaned table</b></td><td><b>1,995</b></td></tr>
+<tr><td>Missing industries filled from the same company</td><td>3</td></tr>
+<tr><td>Date range</td><td>2020-03-11 to 2023-03-06</td></tr>
+<tr><td>Distinct companies / countries / industries</td><td>1,633 / 51 / 31</td></tr>
 </table>
+
+<h3>Known Limitations</h3>
+
+<p>
+Cleaning does not invent values, so some NULLs remain in the final table. Keep these in mind when reading the analysis:
+</p>
+
+<table>
+<tr><th>Column</th><th>Rows still NULL</th></tr>
+<tr><td><code>total_laid_off</code></td><td>378</td></tr>
+<tr><td><code>percentage_laid_off</code></td><td>423</td></tr>
+<tr><td><code>funds_raised_millions</code></td><td>165</td></tr>
+<tr><td><code>stage</code></td><td>5</td></tr>
+<tr><td><code>industry</code></td><td>1 (Bally's Interactive, which has only one record)</td></tr>
+<tr><td><code>date</code></td><td>1</td></tr>
+</table>
+
+<p>
+Every remaining row has at least one of <code>total_laid_off</code> or <code>percentage_laid_off</code>. The <code>percentage_laid_off</code> column is still stored as text.
+</p>
 
 <hr>
 
-<h2>🔍 Phase 2: Exploratory Data Analysis</h2>
+<h2>🔍 Phase 2: Exploratory Data Analysis (In Progress)</h2>
 
-<p>File: <code>sql/02_exploratory_data_analysis.sql</code></p>
+<p>File: <code>sql/02_exploratory_data_analysis.sql</code> <i>(to be added)</i></p>
+
+<p>Planned analysis:</p>
 
 <ul>
 <li>Maximum layoffs in a single event and highest layoff percentage</li>
 <li>Companies that laid off 100% of staff, ordered by funds raised</li>
 <li>Total layoffs by company, industry, country, funding stage, and year</li>
-<li>Date range covered by the data</li>
 <li>Monthly layoffs with a <b>rolling total</b> built with a CTE and <code>SUM() OVER</code></li>
 <li>Top 5 companies per year using <code>DENSE_RANK() OVER (PARTITION BY year ORDER BY total)</code></li>
 </ul>
 
-<hr>
-
 <h2>📊 Key Findings</h2>
 
-<p><i>Replace the values below with the results from your own run.</i></p>
-
-<ul>
-<li><b>Company with the most layoffs overall:</b> XXXX (XX,XXX employees)</li>
-<li><b>Most affected industry:</b> XXXX</li>
-<li><b>Most affected country:</b> XXXX</li>
-<li><b>Year with the most layoffs:</b> XXXX</li>
-<li><b>Companies that shut down completely:</b> XXX, with XXXX the best funded</li>
-<li><b>Trend:</b> one or two sentences on how monthly layoffs moved over time</li>
-</ul>
+<p><i>Findings will be added once Phase 2 is complete.</i></p>
 
 <hr>
 
@@ -179,8 +201,8 @@ layoffs-data-cleaning-eda-sql/
 
 <h3>1️⃣ Clone the Repository</h3>
 <pre>
-git clone https://github.com/UmeshBhabad/layoffs-data-cleaning-eda-sql.git
-cd layoffs-data-cleaning-eda-sql
+git clone https://github.com/UmeshBhabad/layoffs_data_cleaning_eda_sql.git
+cd layoffs_data_cleaning_eda_sql
 </pre>
 
 <h3>2️⃣ Create the Database and Import the Raw Data</h3>
@@ -188,23 +210,20 @@ cd layoffs-data-cleaning-eda-sql
 CREATE DATABASE world_layoffs;
 USE world_layoffs;
 </pre>
-<p>In MySQL Workbench, right-click <b>Tables → Table Data Import Wizard</b>, choose <code>data/raw/layoffs.csv</code>, and import it as a table named <code>layoffs</code>.</p>
+<p>In MySQL Workbench, right-click <b>Tables → Table Data Import Wizard</b>, choose <code>data/raw/layoffs.csv</code>, and import it as a table named <code>layoffs</code>. The table should have 2,361 rows, and missing values must be real NULLs: <code>SELECT COUNT(*) FROM layoffs WHERE total_laid_off IS NULL;</code> should return 740.</p>
 
 <h3>3️⃣ Run the Cleaning Script</h3>
-<p>Open <code>sql/01_data_cleaning.sql</code> and run it <b>one statement at a time</b> so you can check the result of each step.</p>
-
-<h3>4️⃣ Run the EDA Script</h3>
-<p>Open <code>sql/02_exploratory_data_analysis.sql</code>. It reads from the cleaned staging table created in step 3.</p>
+<p>Open <code>sql/01_data_cleaning.sql</code> and run it <b>one statement at a time</b> so you can check the result of each step. Expected row counts: 2,361 at the start, 2,356 after removing duplicates, and 1,995 at the end.</p>
 
 <hr>
 
 <h2>🧠 Design Highlights</h2>
 
 <ul>
-<li><b>Raw Data Preserved</b> — all cleaning happens on a staging copy, so mistakes are never permanent</li>
-<li><b>Repeatable Pipeline</b> — scripts run top to bottom on a fresh import and produce the same result</li>
+<li><b>Raw Data Preserved</b> — all cleaning happens on staging copies, so mistakes are never permanent</li>
+<li><b>Repeatable Pipeline</b> — the script runs top to bottom on a fresh import and produces the same result</li>
 <li><b>Verified Cleaning</b> — each step is followed by a check query that proves the fix worked</li>
-<li><b>Question-Driven EDA</b> — every query answers a specific business question instead of just exploring</li>
+<li><b>Honest Handling of Missing Data</b> — values are filled only when another row of the same company supports it, never guessed</li>
 </ul>
 
 <hr>
@@ -212,10 +231,11 @@ USE world_layoffs;
 <h2>🔮 Future Enhancements</h2>
 
 <ul>
-<li>Visualize the EDA results in Tableau, Power BI, or Excel and add the dashboard screenshots to <code>images/</code></li>
-<li>Re-implement the cleaning pipeline in Python (pandas) to compare both approaches</li>
+<li>Complete the EDA phase and add the findings above</li>
+<li>Convert <code>percentage_laid_off</code> from text to <code>DECIMAL</code> for numeric analysis</li>
+<li>Visualize the results in Tableau, Power BI, or Excel</li>
+<li>Re-implement the cleaning pipeline in Python (pandas) and compare the results</li>
 <li>Wrap the cleaning steps in a stored procedure for one-click reruns</li>
-<li>Add indexes on frequently grouped columns and compare query plans with <code>EXPLAIN</code></li>
 </ul>
 
 <hr>
@@ -223,7 +243,7 @@ USE world_layoffs;
 <h2>📖 Source</h2>
 
 <p>
-Project steps follow the data cleaning and exploratory data analysis mini projects in <i>Learn SQL Beginner to Advanced in Under 4 Hours</i> by <b>Alex The Analyst</b> (<a href="https://youtu.be/OT1RErkfLNQ">YouTube</a>). The dataset comes from that course. Queries, notes, and findings are my own work.
+Project steps follow the data cleaning and exploratory data analysis mini projects in <i>Learn SQL Beginner to Advanced in Under 4 Hours</i> by <b>Alex The Analyst</b> (<a href="https://youtu.be/OT1RErkfLNQ">YouTube</a>). The dataset comes from that course. Notes, checks, and the documented data quality results are my own work.
 </p>
 
 <hr>
