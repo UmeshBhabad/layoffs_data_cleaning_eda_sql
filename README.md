@@ -10,7 +10,8 @@ An end-to-end MySQL project that cleans a raw global tech layoffs dataset and th
 
 <ul>
 <li>✅ <b>Phase 1: Data Cleaning</b> — complete (<a href="sql/01_data_cleaning.sql">sql/01_data_cleaning.sql</a>)</li>
-<li>🚧 <b>Phase 2: Exploratory Data Analysis</b> — in progress</li>
+<li>✅ <b>Phase 2: Exploratory Data Analysis</b> — complete (<a href="sql/02_exploratory_data_analysis.sql">sql/02_exploratory_data_analysis.sql</a>)</li>
+<li>🔜 <b>Next:</b> dashboard in Power BI</li>
 </ul>
 
 <hr>
@@ -30,8 +31,10 @@ The cleaning phase never touches the raw table. All changes happen on <b>staging
 <li>Standardizing text, country names, and date formats</li>
 <li>Handling NULL and blank values, including filling gaps with a self join</li>
 <li>Dropping rows and columns that carry no usable information</li>
+<li>Converting the percentage column from text to <code>DECIMAL(5,4)</code> for numeric analysis</li>
 <li>Analyzing layoffs by company, industry, country, stage, and time period <i>(Phase 2)</i></li>
-<li>Building rolling monthly totals and yearly company rankings <i>(Phase 2)</i></li>
+<li>Building rolling monthly totals, yearly rankings, and year-over-year change <i>(Phase 2)</i></li>
+<li>Testing questions the course did not cover: company size, funding versus closure, and concentration <i>(Phase 2)</i></li>
 </ul>
 
 <hr>
@@ -44,6 +47,9 @@ The cleaning phase never touches the raw table. All changes happen on <b>staging
 <li>Which industries and countries were affected the most?</li>
 <li>How did layoffs change year by year and month by month?</li>
 <li>Who were the top 5 companies by layoffs in each year?</li>
+<li>Did larger companies cut a smaller share of their workforce?</li>
+<li>Did companies that raised more money shut down less often?</li>
+<li>How concentrated were the layoffs among a few companies?</li>
 </ul>
 
 <hr>
@@ -81,10 +87,11 @@ The dataset contains one row per layoff event. The raw file is stored in <code>d
 
 <ul>
 <li>Staging tables (<code>CREATE TABLE ... LIKE</code>, <code>INSERT INTO ... SELECT</code>)</li>
-<li>CTEs and window functions (<code>ROW_NUMBER</code>, with <code>DENSE_RANK</code> and rolling <code>SUM() OVER</code> planned for Phase 2)</li>
+<li>CTEs and window functions (<code>ROW_NUMBER</code>, <code>DENSE_RANK</code>, <code>LAG</code>, rolling and grand-total <code>SUM() OVER</code>)</li>
 <li>String functions (<code>TRIM</code>) and <code>STR_TO_DATE</code></li>
 <li>Self joins, <code>UPDATE</code>, <code>ALTER TABLE</code>, <code>DELETE</code></li>
-<li><code>GROUP BY</code>, aggregate functions, and <code>ORDER BY</code> <i>(Phase 2)</i></li>
+<li><code>GROUP BY</code>, <code>HAVING</code>, aggregate functions, and <code>ORDER BY</code></li>
+<li><code>CASE</code> for banding and rate calculations, <code>NULLIF</code> to avoid divide-by-zero</li>
 </ul>
 
 <hr>
@@ -104,11 +111,11 @@ layoffs_data_cleaning_eda_sql/
 │
 └── sql/
     ├── 01_data_cleaning.sql               # Phase 1: cleaning pipeline
-    └── 02_exploratory_data_analysis.sql   # Phase 2: EDA queries (in progress)
+    └── 02_exploratory_data_analysis.sql   # Phase 2: EDA queries (11 sections)
 </pre>
 
 <p>
-The cleaned table is created by running <code>01_data_cleaning.sql</code>. It is stored in the database as <code>layoffs_staging2</code>.
+The cleaned table is created by running <code>01_data_cleaning.sql</code>. It is stored in the database as <code>layoffs_cleaned</code>.
 </p>
 
 <hr>
@@ -126,6 +133,7 @@ The cleaned table is created by running <code>01_data_cleaning.sql</code>. It is
   <li>Merge three spellings of the same industry (<code>Crypto</code>, <code>Crypto Currency</code>, <code>CryptoCurrency</code>) into <code>Crypto</code></li>
   <li>Fix <code>United States.</code> (trailing period) so it matches <code>United States</code></li>
   <li>Convert <code>date</code> from text with <code>STR_TO_DATE</code> and change the column type to <code>DATE</code></li>
+  <li>Convert <code>percentage_laid_off</code> from text to <code>DECIMAL(5,4)</code> so it can be averaged and compared</li>
   </ul>
 </li>
 <li><b>Handle NULL and blank values</b>
@@ -140,6 +148,7 @@ The cleaned table is created by running <code>01_data_cleaning.sql</code>. It is
   <li>Drop the helper <code>row_num</code> column</li>
   </ul>
 </li>
+<li><b>Rename the final table</b> from <code>layoffs_staging2</code> to <code>layoffs_cleaned</code></li>
 </ol>
 
 <h3>Data Quality Summary</h3>
@@ -172,28 +181,60 @@ Cleaning does not invent values, so some NULLs remain in the final table. Keep t
 </table>
 
 <p>
-Every remaining row has at least one of <code>total_laid_off</code> or <code>percentage_laid_off</code>. The <code>percentage_laid_off</code> column is still stored as text.
+Every remaining row has at least one of <code>total_laid_off</code> or <code>percentage_laid_off</code>. Because 378 headcounts are missing, every total in the analysis is a <b>lower bound</b>.
 </p>
 
 <hr>
 
-<h2>🔍 Phase 2: Exploratory Data Analysis (In Progress)</h2>
+<h2>🔍 Phase 2: Exploratory Data Analysis</h2>
 
-<p>File: <code>sql/02_exploratory_data_analysis.sql</code> <i>(to be added)</i></p>
+<p>File: <a href="sql/02_exploratory_data_analysis.sql">sql/02_exploratory_data_analysis.sql</a></p>
 
-<p>Planned analysis:</p>
+<p>Sections 1 to 5 follow the course. Sections 6 to 11 are my own extensions.</p>
 
-<ul>
-<li>Maximum layoffs in a single event and highest layoff percentage</li>
-<li>Companies that laid off 100% of staff, ordered by funds raised</li>
-<li>Total layoffs by company, industry, country, funding stage, and year</li>
-<li>Monthly layoffs with a <b>rolling total</b> built with a CTE and <code>SUM() OVER</code></li>
-<li>Top 5 companies per year using <code>DENSE_RANK() OVER (PARTITION BY year ORDER BY total)</code></li>
-</ul>
+<table>
+<tr><th>#</th><th>Section</th><th>Key technique</th></tr>
+<tr><td>1</td><td>Extremes and period covered</td><td><code>MAX</code>, <code>MIN</code></td></tr>
+<tr><td>2</td><td>Totals by industry, country, year, stage</td><td><code>GROUP BY</code></td></tr>
+<tr><td>3</td><td>Severity by company</td><td><code>AVG</code></td></tr>
+<tr><td>4</td><td>Monthly totals and rolling total</td><td>CTE, <code>SUM() OVER (ORDER BY)</code></td></tr>
+<tr><td>5</td><td>Company rankings per year</td><td><code>DENSE_RANK() OVER (PARTITION BY)</code></td></tr>
+<tr><td>6</td><td>Severity by industry and stage</td><td><code>HAVING</code> for minimum sample size</td></tr>
+<tr><td>7</td><td>Estimated company size</td><td><code>NULLIF</code>, <code>CASE</code> buckets</td></tr>
+<tr><td>8</td><td>Year-over-year and month-over-month change</td><td><code>LAG</code></td></tr>
+<tr><td>9</td><td>Funding and closure rate</td><td><code>SUM(CASE ...)</code> rates</td></tr>
+<tr><td>10</td><td>Concentration in the top 10 companies</td><td><code>SUM() OVER ()</code>, cumulative share</td></tr>
+<tr><td>11</td><td>Top 3 industries per year</td><td>Two CTEs + <code>DENSE_RANK</code></td></tr>
+</table>
+
+<hr>
 
 <h2>📊 Key Findings</h2>
 
-<p><i>Findings will be added once Phase 2 is complete.</i></p>
+<p>
+Totals count only events with a known headcount (1,617 of 1,995 rows), so they are <b>lower bounds</b>. The dataset records about <b>383,659</b> layoffs between March 2020 and March 2023.
+</p>
+
+<ul>
+<li><b>Layoffs peaked at the end of the data.</b> The largest single events were Google (12,000, Jan 2023), Meta (11,000, Nov 2022) and Amazon (10,000, Nov 2022). January 2023 alone had 84,714 recorded layoffs, the highest month in the dataset.</li>
+<li><b>2023 is not a full year.</b> It covers only January to early March, so its yearly total understates it. Per month, 2023 averaged about 41,900 layoffs, against about 13,400 in 2022, 1,400 in 2021 and 8,100 in 2020 (section 8c).</li>
+<li><b>Layoffs were concentrated.</b> The top 10 companies out of 1,328 account for about <b>25.7%</b> of all layoffs, with Amazon the largest at 4.7%.</li>
+<li><b>Leading industries changed every year:</b> Transportation (2020), Consumer (2021), Retail (2022) and Other (2023). Consumer, Retail and Other lead the all-time totals, and Consumer appears in the top 3 for 2021, 2022 and 2023.</li>
+<li><b>The United States dominates by headcount</b> (about 256,600), followed by India (about 36,000) and the Netherlands (about 17,200).</li>
+<li><b>Larger companies cut a smaller share of staff.</b> Average percentage laid off falls from 0.46 for companies under 100 employees to 0.07 for those with 10,000 or more (company size is estimated from headcount and percentage).</li>
+<li><b>Early-stage companies were far more likely to shut down.</b> Seed-stage events had a 48.9% closure rate (average 70% of staff cut), against 1.0% for Post-IPO companies.</li>
+<li><b>More funding, fewer closures.</b> Closure rate falls from 38.2% for companies with under $10M raised, to 9.8% for $10M to $99M, to 1.7% for $100M to $999M. The $1B+ band shows 3.6%, but it has only 140 events, so treat it with caution.</li>
+</ul>
+
+<h3>Caveats</h3>
+
+<ul>
+<li><b>Missing data:</b> total_laid_off is NULL in 378 rows and percentage_laid_off in 423, so totals are lower bounds and rates use only rows with known values.</li>
+<li><b>Estimated company size</b> is derived from rounded percentages, so it is approximate.</li>
+<li><b>"Closure"</b> means 100% of staff laid off in an event, which may not mean the company ceased to exist.</li>
+<li><b>Case variants</b> of company names (for example <code>SalesLoft</code> and <code>Salesloft</code>) are merged by MySQL's case-insensitive collation in <code>GROUP BY</code>, and were left as they are in the table.</li>
+<li><b>May 2021</b> has no rows, so the month-over-month comparison for June 2021 is against April.</li>
+</ul>
 
 <hr>
 
@@ -231,9 +272,7 @@ USE world_layoffs;
 <h2>🔮 Future Enhancements</h2>
 
 <ul>
-<li>Complete the EDA phase and add the findings above</li>
-<li>Convert <code>percentage_laid_off</code> from text to <code>DECIMAL</code> for numeric analysis</li>
-<li>Visualize the results in Tableau, Power BI, or Excel</li>
+<li>Build a Power BI dashboard from the key query results and add screenshots here</li>
 <li>Re-implement the cleaning pipeline in Python (pandas) and compare the results</li>
 <li>Wrap the cleaning steps in a stored procedure for one-click reruns</li>
 </ul>
